@@ -1,9 +1,10 @@
 package net.reasoning.transfigure
 
-case class ReaderStream[T](input: Seq[T]) {
-
-  def startsWith(string: Seq[T]): Boolean = input.startsWith(string)
-
-  def advance(n: Int): ReaderStream[T] = new ReaderStream(input.drop(n))
-
+abstract class ReaderStream[T] {
+  def advance(n: Int): ReaderStream[T]
 }
+
+case class StringReader(stream: String) extends ReaderStream[Char] {
+  def advance(n: Int) = StringReader(stream.drop(n))
+}
+

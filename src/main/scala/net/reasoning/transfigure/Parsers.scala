@@ -1,8 +1,11 @@
 package net.reasoning.transfigure
 
+import scala.util.matching.Regex
+
+
 trait Parsers {
 
-  type Input = ReaderStream[Elem]
+  type Input
   type Elem
 
   case class ParserError(message: String)
@@ -18,10 +21,10 @@ trait Parsers {
 
 trait StringParsers extends Parsers {
   type Elem = Char
+  type Input = StringReader
 
   def string(str: String): Parser[String] = input => {
-    if (input.startsWith(str)) Right((str, input.advance(str.length)))
+    if (input.stream.startsWith(str)) Right((str, input.advance(str.length)))
     else Left(ParserError(s"Expected $str"))
   }
-
 }

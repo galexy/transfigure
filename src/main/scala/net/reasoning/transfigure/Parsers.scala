@@ -2,6 +2,8 @@ package net.reasoning.transfigure
 
 import scala.util.matching.Regex
 import cats.Applicative
+import cats.{Eval,Now,Later}
+import cats.implicits._
 import cats.syntax.applicative._
 
 trait Parsers {
@@ -12,15 +14,6 @@ trait Parsers {
   case class ParserError(message: String)
 
   type ParserResult[+T] = Either[ParserError, (T, Input)]
-
-  abstract class Parser[+T] extends (Input => ParserResult[T]) {
-    def apply(in: Input): ParserResult[T]
-
-    def <|>[U >: T](p2: Parser[U]): Parser[U] = input => this(input) match {
-      case Right((res,in)) => Right((res,in))
-      case Left(_) => p2(input)
-    }
-  }
 
   implicit val parserApplicative: Applicative[Parser] =
     new Applicative[Parser] {
@@ -36,10 +29,33 @@ trait Parsers {
           case Left(e)    => Left(e)
         }
       }
+
+      // Need to override map2Eval to short circuit evalation of the second parser
+      // See Parser.many below to see why. This particular flatMap call is not
+      // pretty because of the tuple type in the ParserResult
+      override def map2Eval[A, B, Z](fa: Parser[A], efb: Eval[Parser[B]])(f: (A, B) ⇒ Z): Eval[Parser[Z]] =
+        Now(input => fa(input) flatMap (a => efb.value(a._2).map(b => (f(a._1, b._1),b._2))))
     }
 
-  def unit[T](a: T)(implicit app: Applicative[Parser]): Parser[T] = app.pure(a)
+  abstract class Parser[+T] extends (Input => ParserResult[T]) {
+    def apply(in: Input): ParserResult[T]
 
+    def or[U >: T](p2: Parser[U]): Parser[U] = input => this(input) match {
+      case Right((res,in)) => Right((res,in))
+      case Left(_) => p2(input)
+    }
+
+    def many: Parser[List[T]] = this.map2Eval(Later(this.many))(_ :: _).value or pure(List())
+    def zeroOrOne: Parser[Option[T]] = this map (Some(_)) or unit(None)
+    def oneOrMore: Parser[List[T]] = (this product this.*) map (a => a._1 :: a._2)
+
+    def * = many
+    def ? = zeroOrOne
+    def + = oneOrMore
+    def <|>[U >: T](p2 :Parser[U]) = or(p2)
+  }
+
+  def unit[T](a: T)(implicit app: Applicative[Parser]): Parser[T] = app.pure(a)
   def pure[T](a: T)(implicit app: Applicative[Parser]): Parser[T] = app.pure(a)
   def pure[A,B,C](a: Function2[A,B,C])(implicit app: Applicative[Parser]) = app.pure(a.curried)
   def pure[A,B,C,D](a: Function3[A,B,C,D])(implicit app: Applicative[Parser]) = app.pure(a.curried)

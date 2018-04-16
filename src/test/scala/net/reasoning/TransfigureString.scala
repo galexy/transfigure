@@ -28,4 +28,14 @@ class StringParser extends FunSuite with Inside {
       assert(input.toString == "foobar")
     }
   }
+
+  test("Regex parser matches regex") {
+    val parser = new Object() with RegexParsers
+    val reader = StringReader("123foo")
+    val regexParser = parser.regex("(\\d+)".r)
+
+    inside(regexParser(reader)) { case Right((v, _)) =>
+      assert(v == "123")
+    }
+  }
 }

@@ -1,0 +1,36 @@
+* Transfigure Parser Library [[https://travis-ci.org/galexy/transfigure.svg?branch=gsy-ci-scaffold]]
+
+
+
+** Welcome
+
+Transfigure is a yet another parser combinator library. This library is meant was an exploration 
+into building parsers using functional techniques and to extend the functionality with better
+error handling than the [[https://github.com/scala/scala-parser-combinators][scala-parser-combinators]] 
+library. It supports the applicative style which yields more concise code than the monadic form.
+
+** Documentation
+None at this time
+
+** Example
+#+BEGIN_SRC scala
+
+import net.reasoning.transfigure._
+import cats.Applicative
+import cats.implicits._
+import cats.syntax.applicative._
+
+object ExampleParsers extends StringParsers {
+  def foo = string("foo")
+  def bar = string("bar")
+  def baz = string("baz")
+
+  def nonsense = pure(Node.apply _) <*> foo <*> bar <*> baz
+}
+
+object Main extends App {
+  val reader = StringReader("foobarbaz")
+  val result = ExampleParsers.nonsense(reader)
+}
+
+#+END_SRC

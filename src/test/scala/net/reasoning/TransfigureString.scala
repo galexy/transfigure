@@ -83,4 +83,20 @@ class StringParser extends FunSuite with Inside {
       assert(e == "baz")
     }
   }
+
+  test("Alternative between parsers") {
+    object TestParser extends StringParsers {
+      def foo = string("foo")
+      def bar = string("bar")
+      def baz = string("baz")
+
+      def test = foo <|> bar <|> baz
+    }
+
+    val reader = StringReader("baz123")
+
+    inside(TestParser.test(reader)) { case Right((s, _)) =>
+      assert(s == "baz")
+    }
+  }
 }

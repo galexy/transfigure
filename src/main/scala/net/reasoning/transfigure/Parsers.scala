@@ -15,6 +15,11 @@ trait Parsers {
 
   abstract class Parser[+T] extends (Input => ParserResult[T]) {
     def apply(in: Input): ParserResult[T]
+
+    def <|>[U >: T](p2: Parser[U]): Parser[U] = input => this(input) match {
+      case Right((res,in)) => Right((res,in))
+      case Left(_) => p2(input)
+    }
   }
 
   implicit val parserApplicative: Applicative[Parser] =

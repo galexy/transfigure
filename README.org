@@ -20,12 +20,14 @@ import cats.Applicative
 import cats.implicits._
 import cats.syntax.applicative._
 
+case class Nonsense(foo: String, bar: String, baz: String)
+
 object ExampleParsers extends StringParsers {
   def foo = string("foo")
   def bar = string("bar")
   def baz = string("baz")
 
-  def nonsense = pure(Node.apply _) <*> foo <*> bar <*> baz
+  def nonsense = pure(Nonsense.apply _) <*> foo <*> bar <*> baz
 }
 
 object Main extends App {

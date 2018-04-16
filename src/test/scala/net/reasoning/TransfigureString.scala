@@ -4,6 +4,10 @@ import net.reasoning.transfigure._
 import org.scalatest.FunSuite
 import org.scalatest.Inside
 
+import cats.Applicative
+import cats.implicits._
+import cats.syntax.applicative._
+
 class StringParser extends FunSuite with Inside {
 
   test("StringParser can recognized a single character") {
@@ -19,11 +23,13 @@ class StringParser extends FunSuite with Inside {
   }
 
   test("Unit lifts a value into the parser. It should not consume any input") {
-    val parser = new Object() with StringParsers
-    val reader = StringReader("foobar")
-    val unitParser = parser.unit(123)
+    object TestParser extends StringParsers {
+      def unitParser = unit(123)
+    }
 
-    inside(unitParser(reader)) { case Right((v, StringReader(input))) =>
+    val reader = StringReader("foobar")
+
+    inside(TestParser.unitParser(reader)) { case Right((v, StringReader(input))) =>
       assert(v == 123)
       assert(input.toString == "foobar")
     }
@@ -36,6 +42,45 @@ class StringParser extends FunSuite with Inside {
 
     inside(regexParser(reader)) { case Right((v, _)) =>
       assert(v == "123")
+    }
+  }
+
+  test("Applicative parser style") {
+
+    // AST node
+    case class Node(s1: String)
+
+    object TestParser extends StringParsers {
+      // Using the applicative style
+      // Reads "foo" and skips it and saves "bar"
+      def test = pure(Node.apply _) <*> string("foo") *> string("bar")
+    }
+
+    val reader = StringReader("foobar")
+
+    inside(TestParser.test(reader)) { case Right((Node(s1), _)) =>
+      assert(s1 == "bar")
+    }
+  }
+
+  test("Applicative with more than one parameter") {
+    // AST node
+    case class Node(left: String, right: String, extra: String)
+
+    object TestParser extends StringParsers {
+      def foo = string("foo")
+      def bar = string("bar")
+      def baz = string("baz")
+
+      def test = pure(Node.apply _) <*> foo <*> bar <*> baz
+    }
+
+    val reader = StringReader("foobarbaz")
+
+    inside(TestParser.test(reader)) { case Right((Node(r,l,e), _)) =>
+      assert(r == "foo")
+      assert(l == "bar")
+      assert(e == "baz")
     }
   }
 }

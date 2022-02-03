@@ -1,6 +1,5 @@
 package net.reasoning.transfigure
 
-import scala.util.matching.Regex
 import cats.Applicative
 import cats.{Eval,Now,Later}
 import cats.implicits._
@@ -15,34 +14,16 @@ trait Parsers {
 
   type ParserResult[+T] = Either[ParserError, (T, Input)]
 
-  implicit val parserApplicative: Applicative[Parser] =
-    new Applicative[Parser] {
-      def pure[A](a: A):Parser[A] = input => Right((a, input))
-
-      override def map[A,B](pa: Parser[A])(f: A => B): Parser[B] = input => {
-        pa(input).map(res => (f(res._1), res._2))
-      }
-
-      def ap[A,B](pf: Parser[A => B])(pa: Parser[A]): Parser[B] = input => {
-        pf(input) match {
-          case Right((f, in)) => map(pa)(f)(in)
-          case Left(e)    => Left(e)
-        }
-      }
-
-      // Need to override map2Eval to short circuit evalation of the second parser
-      // See Parser.many below to see why. This particular flatMap call is not
-      // pretty because of the tuple type in the ParserResult
-      override def map2Eval[A, B, Z](fa: Parser[A], efb: Eval[Parser[B]])(f: (A, B) ⇒ Z): Eval[Parser[Z]] =
-        Now(input => fa(input) flatMap (a => efb.value(a._2).map(b => (f(a._1, b._1),b._2))))
-    }
-
   abstract class Parser[+T] extends (Input => ParserResult[T]) {
     def apply(in: Input): ParserResult[T]
 
     def or[U >: T](p2: Parser[U]): Parser[U] = input => this(input) match {
       case Right((res,in)) => Right((res,in))
       case Left(_) => p2(input)
+    }
+
+    def map[U](f: T => U): Parser[U] = input => {
+      this(input).map(res => (f(res._1), res._2))
     }
 
     def many: Parser[List[T]] = this.map2Eval(Later(this.many))(_ :: _).value or pure(List())
@@ -55,8 +36,10 @@ trait Parsers {
     def <|>[U >: T](p2 :Parser[U]) = or(p2)
   }
 
-  def unit[T](a: T)(implicit app: Applicative[Parser]): Parser[T] = app.pure(a)
-  def pure[T](a: T)(implicit app: Applicative[Parser]): Parser[T] = app.pure(a)
+  def unit[T](a: T): Parser[T] = pure(a)
+
+  def pure[T](a: T): Parser[T] = input => Right((a, input))
+
   def pure[A,B,C](a: Function2[A,B,C])(implicit app: Applicative[Parser]) = app.pure(a.curried)
   def pure[A,B,C,D](a: Function3[A,B,C,D])(implicit app: Applicative[Parser]) = app.pure(a.curried)
   def pure[A,B,C,D,E](a: Function4[A,B,C,D,E])(implicit app: Applicative[Parser]) = app.pure(a.curried)
@@ -80,21 +63,26 @@ trait Parsers {
   def pure[A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W](a: Function22[A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W])(implicit app: Applicative[Parser]) = app.pure(a.curried)
 }
 
-trait StringParsers extends Parsers {
-  type Elem = Char
-  type Input = StringReader
+object ParserApplicative {
+  implicit val parserApplicative: Applicative[Parser] =
+    new Applicative[Parser] {
+      def pure[A](a: A):Parser[A] = input => Right((a, input))
 
-  def string(str: String): Parser[String] = input => {
-    if (input.stream.startsWith(str)) Right((str, input.advance(str.length)))
-    else Left(ParserError(s"Expected $str"))
-  }
-}
+      override def map[A,B](pa: Parser[A])(f: A => B): Parser[B] = input => {
+        pa(input).map(res => (f(res._1), res._2))
+      }
 
-trait RegexParsers extends StringParsers {
-  def regex(re: Regex): Parser[String] = input => {
-    re.findPrefixOf(input.stream) match {
-      case Some(s) => Right((s, input.advance(s.length)))
-      case _ => Left(ParserError(s"Couldn't match $re"))
+      def ap[A,B](pf: Parser[A => B])(pa: Parser[A]): Parser[B] = input => {
+        pf(input) match {
+          case Right((f, in)) => map(pa)(f)(in)
+          case Left(e)    => Left(e)
+        }
+      }
+
+      // Need to override map2Eval to short circuit evalation of the second parser
+      // See Parser.many below to see why. This particular flatMap call is not
+      // pretty because of the tuple type in the ParserResult
+      override def map2Eval[A, B, Z](fa: Parser[A], efb: Eval[Parser[B]])(f: (A, B) ⇒ Z): Eval[Parser[Z]] =
+        Now(input => fa(input) flatMap (a => efb.value(a._2).map(b => (f(a._1, b._1),b._2))))
     }
-  }
 }
